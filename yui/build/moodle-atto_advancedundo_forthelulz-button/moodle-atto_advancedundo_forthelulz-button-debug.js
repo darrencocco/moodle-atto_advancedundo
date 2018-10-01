@@ -1,3 +1,5 @@
+YUI.add('moodle-atto_advancedundo_forthelulz-button', function (Y, NAME) {
+
 // This file is part of Moodle - http://moodle.org/
 //
 // Moodle is free software: you can redistribute it and/or modify
@@ -428,3 +430,6 @@ Y.namespace('M.atto_advancedundo_forthelulz').Button = Y.Base.create('button', Y
 
     }
 });
+
+
+}, '@VERSION@', {"requires": ["moodle-editor_atto-plugin"]});

@@ -1,7 +1,7 @@
 {
-  "name": "moodle-atto_undo-button",
+  "name": "moodle-atto_advancedundo_forthelulz-button",
   "builds": {
-    "moodle-atto_undo-button": {
+    "moodle-atto_advancedundo_forthelulz-button": {
       "jsfiles": [
         "button.js"
       ]

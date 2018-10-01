@@ -39,6 +39,6 @@ function atto_undo_strings_for_js() {
             'redo',
             'undo'
         ),
-        'atto_undo'
+        'atto_advancedundo_forthelulz'
     );
 }
