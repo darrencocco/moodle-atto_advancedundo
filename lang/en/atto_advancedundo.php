@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
-$string['pluginname'] = 'Undo/Redo';
-$string['privacy:metadata'] = 'The atto_advancedundo_forthelulz plugin does not store any personal data.';
+$string['pluginname'] = 'Advanced Undo/Redo';
+$string['privacy:metadata'] = 'The atto_advancedundo plugin does not store any personal data.';
 $string['redo'] = 'Redo';
 $string['undo'] = 'Undo';

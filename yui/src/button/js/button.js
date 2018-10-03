@@ -14,7 +14,7 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * @component  atto_advancedundo_forthelulz
+ * @component  atto_advancedundo
  * @copyright  2018 Leigh White
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
@@ -26,12 +26,12 @@
 /**
  * Atto text editor undo plugin.
  *
- * @namespace M.atto_advancedundo_forthelulz
+ * @namespace M.atto_advancedundo
  * @class button
  * @extends M.editor_atto.EditorPlugin
  */
 
-Y.namespace('M.atto_advancedundo_forthelulz').Button = Y.Base.create('button', Y.M.editor_atto.EditorPlugin, [], {
+Y.namespace('M.atto_advancedundo').Button = Y.Base.create('button', Y.M.editor_atto.EditorPlugin, [], {
     /**
      * The maximum saved number of undo steps.
      *

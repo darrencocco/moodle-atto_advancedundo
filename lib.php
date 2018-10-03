@@ -29,7 +29,7 @@ defined('MOODLE_INTERNAL') || die();
  *
  * @return void
  */
-function atto_undo_strings_for_js() {
+function atto_advancedundo_strings_for_js() {
     global $PAGE;
 
     // In order to prevent extra strings to be imported, comment/uncomment the characters
@@ -39,6 +39,6 @@ function atto_undo_strings_for_js() {
             'redo',
             'undo'
         ),
-        'atto_advancedundo_forthelulz'
+        'atto_advancedundo'
     );
 }

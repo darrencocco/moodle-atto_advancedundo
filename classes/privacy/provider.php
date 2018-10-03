@@ -17,12 +17,12 @@
 /**
  * Privacy Subsystem implementation for block_activity_modules.
  *
- * @package    atto_advancedundo_forthelulz
+ * @package    atto_advancedundo
  * @copyright  2018 Andrew Nicols <andrew@nicols.co.uk>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
-namespace atto_advancedundo_forthelulz\privacy;
+namespace atto_advancedundo\privacy;
 
 defined('MOODLE_INTERNAL') || die();
 
