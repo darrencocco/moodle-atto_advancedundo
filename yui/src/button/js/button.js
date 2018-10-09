@@ -299,7 +299,12 @@ Y.namespace('M.atto_advancedundo').Button = Y.Base.create('button', Y.M.editor_a
             clickedEditorButtonClassname:''
         };
 
-        mouseEventState.isMouseClick = (event.type == 'pointerup' && event.pointerType == 'mouse') ? true : false;
+        mouseEventState.isMouseClick = false;
+
+        if ((event.type == 'pointerup' && event.pointerType == 'mouse')     // FF & Chrome
+            || (event.type == 'mouseup')) {                                 // FF 47
+            mouseEventState.isMouseClick = true;
+        }
         mouseEventState.isMouseClickDeadSpace = false;      // true if click on the grey area around buttons
         mouseEventState.isMouseClickInTextEditor = false;
         mouseEventState.isMouseClickOnEditorButton = false;
@@ -311,7 +316,7 @@ Y.namespace('M.atto_advancedundo').Button = Y.Base.create('button', Y.M.editor_a
             // Chrome/Firefox (and to allow for potential other browser differences) return a different
             // element level within the element hierarchy from a mouse click. Therefore need to loop back
             // up through the nested path of html elements to detect what has actually been clicked
-            var path = this._getElementPath(event.srcElement);
+            var path = this._getElementPath(event.target);
             var pathdepth = path.length;
 
             for ($i = 0; $i < pathdepth; $i++) {
