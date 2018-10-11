@@ -1,3 +1,5 @@
+YUI.add('moodle-atto_advancedundo-button', function (Y, NAME) {
+
 // This file is part of Moodle - http://moodle.org/
 //
 // Moodle is free software: you can redistribute it and/or modify
@@ -302,7 +304,7 @@ Y.namespace('M.atto_advancedundo').Button = Y.Base.create('button', Y.M.editor_a
         mouseEventState.isMouseClick = false;
 
         if ((event.type == 'pointerup' && event.pointerType == 'mouse')     // FF & Chrome
-            || (event.type == 'mouseup')) {                                 // FF 47
+            || (event.type == 'mouseup')) {                               // FF 47
             mouseEventState.isMouseClick = true;
         }
         mouseEventState.isMouseClickDeadSpace = false;      // true if click on the grey area around buttons
@@ -433,3 +435,6 @@ Y.namespace('M.atto_advancedundo').Button = Y.Base.create('button', Y.M.editor_a
 
     }
 });
+
+
+}, '@VERSION@', {"requires": ["moodle-editor_atto-plugin"]});

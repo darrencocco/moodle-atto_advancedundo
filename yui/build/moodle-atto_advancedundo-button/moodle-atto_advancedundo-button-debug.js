@@ -1,4 +1,4 @@
-YUI.add('moodle-atto_undo-button', function (Y, NAME) {
+YUI.add('moodle-atto_advancedundo-button', function (Y, NAME) {
 
 // This file is part of Moodle - http://moodle.org/
 //
@@ -16,8 +16,8 @@ YUI.add('moodle-atto_undo-button', function (Y, NAME) {
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * @component  atto_undo
- * @copyright  2014 Jerome Mouneyrac
+ * @component  atto_advancedundo
+ * @copyright  2018 Leigh White
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
@@ -28,12 +28,12 @@ YUI.add('moodle-atto_undo-button', function (Y, NAME) {
 /**
  * Atto text editor undo plugin.
  *
- * @namespace M.atto_undo
+ * @namespace M.atto_advancedundo
  * @class button
  * @extends M.editor_atto.EditorPlugin
  */
 
-Y.namespace('M.atto_undo').Button = Y.Base.create('button', Y.M.editor_atto.EditorPlugin, [], {
+Y.namespace('M.atto_advancedundo').Button = Y.Base.create('button', Y.M.editor_atto.EditorPlugin, [], {
     /**
      * The maximum saved number of undo steps.
      *
@@ -265,34 +265,174 @@ Y.namespace('M.atto_undo').Button = Y.Base.create('button', Y.M.editor_atto.Edit
             this._updateButtonsStates();
             return;
         }
-        // Restore the value.
-        this._restoreValue(redo);
+        // Need to ensure that what we are trying to redo is actual content -
+        // in the case that Ctrl+Y is pressed after the end of the redo stack is empty/null then it won't have content!
+        if (typeof redo === 'string') {
+            // Restore the value.
+            this._restoreValue(redo);
+        }
 
         // Update the button states.
         this._updateButtonsStates();
     },
 
     /**
+     * Read content from top of a stack (without popping)
+     *
+     * @method _filterMouseEvent
+     * @param {Event} The change event
+     * @private
+     */
+    _filterMouseEvent: function(e) {
+
+        var event = e.event._event;
+
+        // CANNOT detect the selection of a paragraph style from the drop down (button labelled i with dropdown)
+        // Clicking the paragraph style button gives an event, however clicking a paragraph style option doesn't
+        // give a click event, just a 'focus' (like every other action).
+        // This also behaves weirdly in that initially, all 'focus' event.type have a value of 'focus'.
+        // After the first time an option is clicked from the paragraph style menu, all subsequent
+        // event.type have a value of 'focusoutside' !!
+
+        var mouseEventState = {
+            isMouseClick:false,
+            isMouseClickInTextEditor:false,
+            isMouseClickOnEditorButton:false,
+            clickedEditorButtonClassname:''
+        };
+
+        mouseEventState.isMouseClick = false;
+
+        if ((event.type == 'pointerup' && event.pointerType == 'mouse')     // FF & Chrome
+            || (event.type == 'mouseup')) {                               // FF 47
+            mouseEventState.isMouseClick = true;
+        }
+        mouseEventState.isMouseClickDeadSpace = false;      // true if click on the grey area around buttons
+        mouseEventState.isMouseClickInTextEditor = false;
+        mouseEventState.isMouseClickOnEditorButton = false;
+        mouseEventState.clickedEditorButtonClassname = '';
+
+        if (mouseEventState.isMouseClick) {
+
+            // Detect where the mouse click occurred.
+            // Chrome/Firefox (and to allow for potential other browser differences) return a different
+            // element level within the element hierarchy from a mouse click. Therefore need to loop back
+            // up through the nested path of html elements to detect what has actually been clicked
+            var path = this._getElementPath(event.target);
+            var pathdepth = path.length;
+
+            for ($i = 0; $i < pathdepth; $i++) {
+
+                var elementClassName = path[$i].className;
+
+                if (elementClassName.includes('editor_atto_content')) {
+                    mouseEventState.isMouseClickInTextEditor = true;
+                    break;
+                } else if (path[$i].nodeName == "BUTTON" ) {
+                    mouseEventState.isMouseClickOnEditorButton = true;
+                    mouseEventState.clickedEditorButtonClassname = elementClassName;
+                    break;
+                } else if (elementClassName.includes('editor_atto_wrap')) {
+                    mouseEventState.isMouseClickDeadSpace = true;
+                    break;
+                }
+            }
+
+        }
+
+        return mouseEventState;
+    },
+
+    /**
+     * Get array of all ancestor elements from a given html element
+     *
+     * @method _getElementPath
+     * @param {el} html element
+     * @private
+     */
+    _getElementPath: function(el) {
+
+        var path = [];
+
+        while (el) {
+
+            path.push(el);
+
+            if (el.tagName === 'HTML') {
+                return path;
+            }
+
+            el = el.parentElement;
+        }
+    },
+
+    /**
+     * Indicates if both the redo button is active
+     *
+     * @method _redoButtonIsActive
+     * @private
+     */
+    _redoButtonIsActive: function(e) {
+
+        return (this._redoStack.length > 0);
+    },
+
+    /**
      * If we are significantly different from the last saved version, save a new version.
      *
      * @method _changeListener
-     * @param {EventFacade} The click event
+     * @param {EventFacade} e - The click event
      * @private
      */
     _changeListener: function(e) {
-        if (e.event && e.event.type.indexOf('key') !== -1) {
-            // These are the 4 arrow keys.
-            if ((e.event.keyCode !== 39) &&
-                    (e.event.keyCode !== 37) &&
-                    (e.event.keyCode !== 40) &&
-                    (e.event.keyCode !== 38)) {
-                // Skip this event type. We only want focus/mouse/arrow events.
+
+        if (e.event == null) {
+            return;
+        }
+
+        var mouseEventState = this._filterMouseEvent(e);
+
+        var eventType = e.event.type;
+        var keycode = e.event.keyCode;
+
+        if (!this._redoButtonIsActive()) {
+            // Only commit text to the undo stack on specific key presses and in-editor mouse clicks
+            // to minimise performance issues that could occur with large amounts of text.
+            var validkeyCodes = [
+                8,                  // Backspace
+                13,                 // Enter
+                37, 38, 39, 40,     // arrow keys
+                46,                 // Delete
+                190                 // .
+            ];
+
+            var isCommitTextKey = (eventType == 'keyup' && validkeyCodes.indexOf(keycode) > -1) ? true : false;
+
+            if (!isCommitTextKey && !mouseEventState.isMouseClickInTextEditor) {
+                return;
+            }
+
+        } else {
+            // Allowing any event through here as there is a possibility it could have caused a text edit
+            // (thereby triggering the redo button to be disabled)
+            // Ideally would only allow events of a specific type through (eg a key press or mouse click),
+            // however the issue is with the paragraph style selector which does not register a mouse button click,
+            // so we cannot tell when it has been triggered!!!!
+
+            // Rejecting:
+            // - press of HTML button as this can cause content change and remove ability redo when it shouldn't.
+            // - mouse click in html editor - this doesn't cause text to change so no need to proceed,
+            // - mouse click on grey area around buttons - this doesn't cause text to change so no need to proceed,
+            if (mouseEventState.clickedEditorButtonClassname.includes('atto_html_button')
+                || mouseEventState.isMouseClickInTextEditor
+                || mouseEventState.isMouseClickDeadSpace) {
                 return;
             }
         }
 
         this._addToUndo(this._getHTML(), true);
         this._updateButtonsStates();
+
     }
 });
 

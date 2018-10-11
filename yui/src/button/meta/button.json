@@ -1,5 +1,5 @@
 {
-    "moodle-atto_undo-button": {
+    "moodle-atto_advancedundo-button": {
         "requires": [
             "moodle-editor_atto-plugin"
         ]
