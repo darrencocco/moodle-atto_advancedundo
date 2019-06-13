@@ -32,33 +32,15 @@
  */
 
 Y.namespace('M.atto_advancedundo').Button = Y.Base.create('button', Y.M.editor_atto.EditorPlugin, [], {
-    /**
-     * The maximum saved number of undo steps.
-     *
-     * @property _maxUndos
-     * @type {Number} The maximum number of saved undos.
-     * @default 40
-     * @private
-     */
-    _maxUndos: 40,
 
     /**
-     * History of edits.
      *
-     * @property _undoStack
-     * @type {Array} The elements of the array are the html strings that make a snapshot
-     * @private
      */
-    _undoStack: null,
+    _webWorker: null,
 
-    /**
-     * History of edits.
-     *
-     * @property _redoStack
-     * @type {Array} The elements of the array are the html strings that make a snapshot
-     * @private
-     */
-    _redoStack: null,
+    _undoStackSize: 0,
+
+    _redoStackSize: 0,
 
     /**
      * Add the buttons to the toolbar
@@ -66,9 +48,9 @@ Y.namespace('M.atto_advancedundo').Button = Y.Base.create('button', Y.M.editor_a
      * @method initializer
      */
     initializer: function() {
-        // Initialise the undo and redo stacks.
-        this._undoStack = [];
-        this._redoStack = [];
+        this._webWorker = new Worker('/lib/editor/atto/plugins/advancedundo/webworkers/build/stacks-manager.min.js');
+
+        this._webWorker.onmessage = this._workerMessageHandler.bind(this);
 
         this.addButton({
             title: 'undo',
@@ -89,48 +71,43 @@ Y.namespace('M.atto_advancedundo').Button = Y.Base.create('button', Y.M.editor_a
         // Enable the undo once everything has loaded.
         this.get('host').on('pluginsloaded', function() {
             // Adds the current value to the stack.
-            this._addToUndo(this._getHTML());
+            this._addToUndo();
             this.get('host').on('atto:selectionchanged', this._changeListener, this);
         }, this);
 
-        this._updateButtonsStates();
+        this._updateButtonStates({
+            undoStackSize: 1,
+            redoStackSize: 0
+        });
     },
 
-    /**
-     * Adds an element to the redo stack.
-     *
-     * @method _addToRedo
-     * @private
-     * @param {String} html The HTML content to save.
-     */
-    _addToRedo: function(html) {
-        this._redoStack.push(html);
-    },
-
-    /**
-     * Adds an element to the undo stack.
-     *
-     * @method _addToUndo
-     * @private
-     * @param {String} html The HTML content to save.
-     * @param {Boolean} [clearRedo=false] Whether or not we should clear the redo stack.
-     */
-    _addToUndo: function(html, clearRedo) {
-        var last = this._undoStack[this._undoStack.length - 1];
-
+    _addToUndo: function(clearRedo) {
         if (typeof clearRedo === 'undefined') {
             clearRedo = false;
         }
+        this._webWorker.postMessage({
+            action: 'AppendUndo',
+            clearRedo: clearRedo,
+            editorContent: this._getEditorContent()
+        });
+    },
 
-        if (last !== html) {
-            this._undoStack.push(html);
-            if (clearRedo) {
-                this._redoStack = [];
-            }
-        }
-
-        while (this._undoStack.length > this._maxUndos) {
-            this._undoStack.shift();
+    _workerMessageHandler: function(message) {
+        switch (message.data.action) {
+            case 'RedoSupplied':
+            case 'UndoSupplied':
+                this._updateButtonStates(message.data);
+                this._restoreValue(message.data);
+                this._webWorker.postMessage({action: 'Unlock'});
+                break;
+            case 'UndoRetained':
+            case 'RedoNoDelta':
+            case 'UndoNoDelta':
+                this._updateButtonStates(message.data);
+                this._webWorker.postMessage({action: 'Unlock'});
+                break;
+            default:
+                break;
         }
     },
 
@@ -141,47 +118,8 @@ Y.namespace('M.atto_advancedundo').Button = Y.Base.create('button', Y.M.editor_a
      * @private
      * @return {String} The HTML.
      */
-    _getHTML: function() {
-        return this.get('host').getCleanHTML();
-    },
-
-    /**
-     * Get an element on the redo stack.
-     *
-     * @method _getRedo
-     * @private
-     * @return {String} The HTML to restore, or undefined.
-     */
-    _getRedo: function() {
-        return this._redoStack.pop();
-    },
-
-    /**
-     * Get an element on the undo stack.
-     *
-     * @method _getUndo
-     * @private
-     * @param {String} current The current HTML.
-     * @return {String} The HTML to restore.
-     */
-    _getUndo: function(current) {
-        if (this._undoStack.length === 1) {
-            return this._undoStack[0];
-        }
-
-        var last = this._undoStack.pop();
-        if (last === current) {
-            // Oops, the latest undo step is the current content, we should unstack once more.
-            // There is no need to do that in a loop as the same stack should never contain duplicates.
-            last = this._undoStack.pop();
-        }
-
-        // We always need to keep the first element of the stack.
-        if (this._undoStack.length === 0) {
-            this._addToUndo(last);
-        }
-
-        return last;
+    _getEditorContent: function() {
+        return this.get('host').editor.get('innerHTML');
     },
 
     /**
@@ -191,27 +129,26 @@ Y.namespace('M.atto_advancedundo').Button = Y.Base.create('button', Y.M.editor_a
      * @private
      * @param {String} html The HTML to restore in the editor.
      */
-    _restoreValue: function(html) {
-        this.editor.setHTML(html);
-        // We always add the restored value to the stack, otherwise an event could think that
-        // the content has changed and clear the redo stack.
-        this._addToUndo(html);
+    _restoreValue: function(message) {
+        this.editor.setHTML(message.contentToRestore);
     },
 
     /**
      * Update the states of the buttons.
      *
-     * @method _updateButtonsStates
+     * @method _updateButtonStates
      * @private
      */
-    _updateButtonsStates: function() {
-        if (this._undoStack.length > 1) {
+    _updateButtonStates: function(message) {
+        this._undoStackSize = message.undoStackSize;
+        this._redoStackSize = message.redoStackSize;
+        if (this._undoStackSize > 1) {
             this.enableButtons('undo');
         } else {
             this.disableButtons('undo');
         }
 
-        if (this._redoStack.length > 0) {
+        if (this._redoStackSize > 0) {
             this.enableButtons('redo');
         } else {
             this.disableButtons('redo');
@@ -227,23 +164,10 @@ Y.namespace('M.atto_advancedundo').Button = Y.Base.create('button', Y.M.editor_a
      */
     _undoHandler: function(e) {
         e.preventDefault();
-        var html = this._getHTML(),
-            undo = this._getUndo(html);
-
-        // Edge case, but that could happen. We do nothing when the content equals the undo step.
-        if (html === undo) {
-            this._updateButtonsStates();
-            return;
-        }
-
-        // Restore the value.
-        this._restoreValue(undo);
-
-        // Add to the redo stack.
-        this._addToRedo(html);
-
-        // Update the button states.
-        this._updateButtonsStates();
+        this._webWorker.postMessage({
+            action: 'GetUndo',
+            editorContent: this._getEditorContent()
+        });
     },
 
     /**
@@ -255,23 +179,10 @@ Y.namespace('M.atto_advancedundo').Button = Y.Base.create('button', Y.M.editor_a
      */
     _redoHandler: function(e) {
         e.preventDefault();
-        var html = this._getHTML(),
-            redo = this._getRedo();
-
-        // Edge case, but that could happen. We do nothing when the content equals the redo step.
-        if (html === redo) {
-            this._updateButtonsStates();
-            return;
-        }
-        // Need to ensure that what we are trying to redo is actual content -
-        // in the case that Ctrl+Y is pressed after the end of the redo stack is empty/null then it won't have content!
-        if (typeof redo === 'string') {
-            // Restore the value.
-            this._restoreValue(redo);
-        }
-
-        // Update the button states.
-        this._updateButtonsStates();
+        this._webWorker.postMessage({
+            action: 'GetRedo',
+            editorContent: this._getEditorContent()
+        });
     },
 
     /**
@@ -319,14 +230,14 @@ Y.namespace('M.atto_advancedundo').Button = Y.Base.create('button', Y.M.editor_a
             var path = this._getElementPath(event.target);
             var pathdepth = path.length;
 
-            for ($i = 0; $i < pathdepth; $i++) {
+            for (var i = 0; i < pathdepth; i++) {
 
-                var elementClassName = path[$i].className;
+                var elementClassName = path[i].className;
 
                 if (elementClassName.includes('editor_atto_content')) {
                     mouseEventState.isMouseClickInTextEditor = true;
                     break;
-                } else if (path[$i].nodeName == "BUTTON" ) {
+                } else if (path[i].nodeName == "BUTTON" ) {
                     mouseEventState.isMouseClickOnEditorButton = true;
                     mouseEventState.clickedEditorButtonClassname = elementClassName;
                     break;
@@ -371,8 +282,7 @@ Y.namespace('M.atto_advancedundo').Button = Y.Base.create('button', Y.M.editor_a
      * @private
      */
     _redoButtonIsActive: function(e) {
-
-        return (this._redoStack.length > 0);
+        return (this._redoStackSize > 0);
     },
 
     /**
@@ -422,14 +332,13 @@ Y.namespace('M.atto_advancedundo').Button = Y.Base.create('button', Y.M.editor_a
             // - mouse click in html editor - this doesn't cause text to change so no need to proceed,
             // - mouse click on grey area around buttons - this doesn't cause text to change so no need to proceed,
             if (mouseEventState.clickedEditorButtonClassname.includes('atto_html_button')
+                || mouseEventState.clickedEditorButtonClassname.includes('atto_advancedundo_button')
                 || mouseEventState.isMouseClickInTextEditor
                 || mouseEventState.isMouseClickDeadSpace) {
                 return;
             }
         }
 
-        this._addToUndo(this._getHTML(), true);
-        this._updateButtonsStates();
-
+        this._addToUndo(true);
     }
 });
