@@ -50,7 +50,7 @@ Y.namespace('M.atto_advancedundo').Button = Y.Base.create('button', Y.M.editor_a
      * @method initializer
      */
     initializer: function() {
-        this._webWorker = new Worker('/lib/editor/atto/plugins/advancedundo/webworkers/build/stacks-manager.min.js');
+        this._webWorker = new Worker('/local/webworkers/loader.php/-1/atto_advancedundo/stacks-manager');
 
         this._webWorker.onmessage = this._workerMessageHandler.bind(this);
 
